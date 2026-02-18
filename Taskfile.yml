@@ -1,0 +1,90 @@
+version: "3"
+
+dotenv: [".env"]
+
+vars:
+  DC: docker compose -f .setup/compose.yml --env-file .env
+  BACKEND_PORT: "6400"
+  FRONTEND_PORT: "5173"
+  OLLAMA_MODEL: "qwen3-coder-next"
+
+tasks:
+  # ===== Docker Compose =====
+  up:
+    desc: Build and start all services
+    cmds:
+      - "{{.DC}} up --build -d"
+      - echo "Waiting for services to become healthy..."
+      - "{{.DC}} exec ollama ollama pull {{.OLLAMA_MODEL}}"
+      - echo ""
+      - echo "Backend   → http://localhost:{{.BACKEND_PORT}}"
+      - echo "Frontend  → http://localhost:{{.FRONTEND_PORT}}"
+      - echo "Ollama    → http://localhost:${OLLAMA_HOST_PORT:-11435}"
+
+  down:
+    desc: Stop and remove containers
+    cmd: "{{.DC}} down"
+
+  restart:
+    desc: Restart all services
+    cmds:
+      - "{{.DC}} down"
+      - "{{.DC}} up --build -d"
+
+  logs:
+    desc: Tail logs from all services
+    cmd: "{{.DC}} logs -f"
+
+  logs:backend:
+    desc: Tail backend logs only
+    cmd: "{{.DC}} logs -f backend"
+
+  logs:ollama:
+    desc: Tail ollama logs only
+    cmd: "{{.DC}} logs -f ollama"
+
+  ps:
+    desc: Show running services
+    cmd: "{{.DC}} ps"
+
+  shell:
+    desc: Open a shell in the backend container
+    cmd: "{{.DC}} exec backend bash"
+
+  # ===== Ollama model management =====
+  ollama:pull:
+    desc: Pull default model into Ollama
+    cmd: "{{.DC}} exec ollama ollama pull {{.OLLAMA_MODEL}}"
+
+  ollama:list:
+    desc: List models available in Ollama
+    cmd: "{{.DC}} exec ollama ollama list"
+
+  ollama:pull-custom:
+    desc: "Pull a specific model (usage: task ollama:pull-custom -- llama3)"
+    cmd: "{{.DC}} exec ollama ollama pull {{.CLI_ARGS}}"
+
+  # ===== Maintenance =====
+  validate:
+    desc: Validate all YAML workflow files
+    cmd: "{{.DC}} exec backend python tools/validate_all_yamls.py"
+
+  sync:
+    desc: Sync Vue graphs to database
+    cmd: "{{.DC}} exec backend python tools/sync_vuegraphs.py"
+
+  clean:
+    desc: Stop containers and remove volumes in .data/
+    prompt: This will delete all data (WareHouse, logs, Ollama models). Continue?
+    cmds:
+      - "{{.DC}} down"
+      - rm -rf .data/ollama/* .data/warehouse/* .data/logs/* .data/data/*
+
+  # ===== Setup =====
+  setup:
+    desc: First-time setup — create .env from template
+    cmds:
+      - cp -n .setup/.env.example .env || true
+      - echo "Created .env — edit it to configure your LLM provider, then run 'task up'"
+    status:
+      - test -f .env
