@@ -35,6 +35,9 @@
       "icon": "terminal-ubuntu"
     }
   },
+  "terminal.integrated.env.windows": {
+    "Path": "${env:LOCALAPPDATA}\\Programs\\docker;${env:Path}"
+  },
   "terminal.integrated.scrollback": 5000,
   "terminal.integrated.cursorBlinking": true,
   "terminal.integrated.cursorStyle": "underline",

@@ -2,7 +2,7 @@
 
 Self-contained multi-agent software generation platform. Users describe what to build;
 a graph of LLM agents (analyst, coder, reviewer, etc.) collaborates to produce working
-code. Runs entirely offline via Ollama.
+code. LLM backend is configurable via `.env` (LM Studio, OpenAI, etc.).
 
 ## Stack
 
@@ -10,15 +10,14 @@ code. Runs entirely offline via Ollama.
 |---|---|---|---|
 | Frontend | Vite + Vue 3 | chatdev_frontend | 5173 |
 | Backend | FastAPI (Python) | chatdev_backend | 6400 |
-| LLM | Ollama | chatdev_ollama | 11435 (host) / 11434 (internal) |
 
-Default model: `glm-4.7-flash` (~19 GB). Set via `MODEL_NAME` in `.env`.
+LLM provider set via `BASE_URL` / `API_KEY` / `MODEL_NAME` in `.env`.
 
 ## Commands
 
 ```bash
 task setup        # create .env from template (one-time)
-task up           # clone + build + start + pull model + clean sample workflows
+task up           # clone + build + start + clean sample workflows
 task down         # stop containers
 task restart      # clean slate: stop + re-clone + rebuild + start
 task ps           # show status

@@ -6,11 +6,41 @@ vars:
   DC: docker compose -f .setup/compose.yml --env-file .env
   BACKEND_PORT: "6400"
   FRONTEND_PORT: "5173"
-  OLLAMA_MODEL: "glm-4.7-flash"
   CHATDEV_REPO: "https://github.com/OpenBMB/ChatDev.git"
   SRC_DIR: ".src"
 
 tasks:
+  default:
+    desc: Show available tasks
+    silent: true
+    cmds:
+      - task --list
+
+  update:
+    desc: Update Claude CLI
+    cmds:
+      - claude update
+      - claude --version
+    silent: true
+
+  claude:
+    desc: Run Claude with specific flags
+    deps:
+      - update
+    vars:
+      ARGS: --chrome --ide --model opus
+    cmds:
+      - claude {{.ARGS}} --continue 2>/dev/null || claude {{.ARGS}}
+    silent: true
+
+  dangerous:
+    desc: Run Claude dangerously...
+    deps:
+      - update
+    cmds:
+      - claude --allow-dangerously-skip-permissions --chrome --ide --model opus --continue
+    silent: true
+
   # ===== Source Management =====
   clone:
     desc: Clone ChatDev repo into .src/ (skips if already present)
@@ -32,13 +62,11 @@ tasks:
     cmds:
       - "{{.DC}} up --build -d"
       - echo "Waiting for services to become healthy..."
-      - "{{.DC}} exec ollama ollama pull {{.OLLAMA_MODEL}}"
       - task: clean-workflows
-      - task: ollama:warmup
       - echo ""
       - echo "Backend   → http://localhost:{{.BACKEND_PORT}}"
       - echo "Frontend  → http://localhost:{{.FRONTEND_PORT}}"
-      - echo "Ollama    → http://localhost:${OLLAMA_HOST_PORT:-11435}"
+      - echo "LLM       → $BASE_URL"
 
   down:
     desc: Stop and remove containers
@@ -59,10 +87,6 @@ tasks:
     desc: Tail backend logs only
     cmd: "{{.DC}} logs -f backend"
 
-  logs:ollama:
-    desc: Tail ollama logs only
-    cmd: "{{.DC}} logs -f ollama"
-
   ps:
     desc: Show running services
     cmd: "{{.DC}} ps"
@@ -70,27 +94,6 @@ tasks:
   shell:
     desc: Open a shell in the backend container
     cmd: "{{.DC}} exec backend bash"
-
-  # ===== Ollama model management =====
-  ollama:pull:
-    desc: Pull default model into Ollama
-    cmd: "{{.DC}} exec ollama ollama pull {{.OLLAMA_MODEL}}"
-
-  ollama:list:
-    desc: List models available in Ollama
-    cmd: "{{.DC}} exec ollama ollama list"
-
-  ollama:pull-custom:
-    desc: "Pull a specific model (usage: task ollama:pull-custom -- llama3)"
-    cmd: "{{.DC}} exec ollama ollama pull {{.CLI_ARGS}}"
-
-  ollama:warmup:
-    desc: Warm up the model by loading it into GPU VRAM
-    cmd: |
-      echo "Warming up {{.OLLAMA_MODEL}} (loading into GPU)..."
-      curl -sf http://localhost:${OLLAMA_HOST_PORT:-11435}/api/generate \
-        -d "{\"model\":\"{{.OLLAMA_MODEL}}\",\"prompt\":\"hi\",\"stream\":false}" \
-        > /dev/null && echo "Model loaded into GPU." || echo "Warmup failed (non-fatal)."
 
   # ===== Workflow Cleanup =====
   clean-workflows:
@@ -115,6 +118,11 @@ tasks:
         "
 
   # ===== Maintenance =====
+  purge:
+    desc: Forcefully delete all .gitignored paths (.data/, .setup/, .src/, etc.)
+    prompt: This will delete ALL gitignored files and directories. Continue?
+    cmd: git clean -ffdX -e .setup/
+
   validate:
     desc: Validate all YAML workflow files
     cmd: "{{.DC}} exec backend python tools/validate_all_yamls.py"
@@ -125,16 +133,15 @@ tasks:
 
   clean:
     desc: Stop containers and remove volumes in .data/
-    prompt: This will delete all data (WareHouse, logs, Ollama models). Continue?
+    prompt: This will delete all data (WareHouse, logs). Continue?
     cmds:
       - "{{.DC}} down"
-      - rm -rf .data/ollama/* .data/warehouse/* .data/logs/* .data/data/*
+      - rm -rf .data/warehouse/* .data/logs/* .data/data/*
 
   # ===== Setup =====
   setup:
     desc: First-time setup — create .env from template
+    deps: [purge]
     cmds:
-      - cp -n .setup/.env.example .env || true
+      - test -f .env || cp .setup/.env.example .env
       - echo "Created .env — edit it to configure your LLM provider, then run 'task up'"
-    status:
-      - test -f .env
