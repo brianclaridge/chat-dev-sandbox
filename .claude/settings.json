@@ -21,10 +21,12 @@
   "permissions": {
     "allow": [
       "Bash",
+      "Bash(docker --version:*)",
+      "Bash(docker compose:*)",
       "Bash(task:*)",
       "Bash(tree:*)",
       "Bash(grep:*)",
-      "Bash(task:*)",
+      "Bash(curl:*)",
       "Bash(claude:*)",
       "Bash(python3:*)",
       "Bash(python:*)",
@@ -34,6 +36,8 @@
       "Bash(uv run task:*)",
       "Bash(gh:*)",
       "Bash(glab:*)",
+      "Bash(ss:*)",
+      "Bash(netstat:*)",
       "Write",
       "Edit",
       "WebFetch",
@@ -42,7 +46,9 @@
       "KillShell",
       "Skill",
       "WebFetch(domain:docs.anthropic.com)",
-      "WebFetch(domain:docs.claude.com)"
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:ollama.com)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": ["Bash(rm:*)"],

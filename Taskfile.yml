@@ -7,15 +7,33 @@ vars:
   BACKEND_PORT: "6400"
   FRONTEND_PORT: "5173"
   OLLAMA_MODEL: "qwen3-coder-next"
+  CHATDEV_REPO: "https://github.com/OpenBMB/ChatDev.git"
+  SRC_DIR: ".src"
 
 tasks:
+  # ===== Source Management =====
+  clone:
+    desc: Clone ChatDev repo into .src/ (skips if already present)
+    cmds:
+      - git clone {{.CHATDEV_REPO}} {{.SRC_DIR}}
+    status:
+      - test -d {{.SRC_DIR}}/.git
+
+  reclone:
+    desc: Delete .src/ and re-clone ChatDev from scratch
+    cmds:
+      - rm -rf {{.SRC_DIR}}
+      - task: clone
+
   # ===== Docker Compose =====
   up:
     desc: Build and start all services
+    deps: [clone]
     cmds:
       - "{{.DC}} up --build -d"
       - echo "Waiting for services to become healthy..."
       - "{{.DC}} exec ollama ollama pull {{.OLLAMA_MODEL}}"
+      - task: clean-workflows
       - echo ""
       - echo "Backend   → http://localhost:{{.BACKEND_PORT}}"
       - echo "Frontend  → http://localhost:{{.FRONTEND_PORT}}"
@@ -26,10 +44,11 @@ tasks:
     cmd: "{{.DC}} down"
 
   restart:
-    desc: Restart all services
+    desc: Stop, re-clone ChatDev source, rebuild and start
     cmds:
       - "{{.DC}} down"
-      - "{{.DC}} up --build -d"
+      - task: reclone
+      - task: up
 
   logs:
     desc: Tail logs from all services
@@ -63,6 +82,28 @@ tasks:
   ollama:pull-custom:
     desc: "Pull a specific model (usage: task ollama:pull-custom -- llama3)"
     cmd: "{{.DC}} exec ollama ollama pull {{.CLI_ARGS}}"
+
+  # ===== Workflow Cleanup =====
+  clean-workflows:
+    desc: Remove all sample workflows shipped with ChatDev
+    cmds:
+      - |
+        python3 -c "
+        import json, urllib.request
+
+        BASE = 'http://localhost:{{.BACKEND_PORT}}'
+        with urllib.request.urlopen(f'{BASE}/api/workflows') as r:
+            workflows = json.loads(r.read()).get('workflows', [])
+        deleted = 0
+        for wf in workflows:
+            req = urllib.request.Request(f'{BASE}/api/workflows/{wf}', method='DELETE')
+            try:
+                urllib.request.urlopen(req)
+                deleted += 1
+            except Exception as e:
+                print(f'  ✗ {wf}: {e}')
+        print(f'Cleaned {deleted} sample workflow(s).')
+        "
 
   # ===== Maintenance =====
   validate:

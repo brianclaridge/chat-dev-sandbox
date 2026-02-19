@@ -10,32 +10,32 @@ Local multi-agent AI workflow platform. Runs entirely offline with Ollama.
 ## Quickstart
 
 ```bash
-git clone https://github.com/OpenBMB/ChatDev.git
 task setup
 task up
 ```
 
 Open http://localhost:5173
 
-## Claude Code Skills
+## Claude Code
 
-Requires services running (`task up`).
+One command to build anything — software, games, visualizations, research:
 
 ```bash
+/chatdev A space shooter with power-ups
 /chatdev Build a CLI tool that converts CSV to JSON
-/chatdev-game A space shooter with power-ups
-/chatdev-viz Analyze trends from ./data/sales.csv
-/chatdev-research Compare Rust vs Go for CLI tools
-/chatdev-validate ./my-workflow.yaml
-/chatdev-workflows
-/chatdev-status <session-id>
+/chatdev Analyze trends from ./data/sales.csv
+/chatdev Compare Rust vs Go for CLI tools
 ```
+
+A CTO-led team (architect, engineer, reviewer) spins up, designs a custom
+workflow from scratch, executes it, and delivers results.
 
 ## Commands
 
 ```text
 task up           Start all services
 task down         Stop all services
+task restart      Clean slate rebuild
 task ps           Show status
 task logs         Tail logs
 task shell        Shell into backend
@@ -43,14 +43,16 @@ task shell        Shell into backend
 task ollama:list                   List models
 task ollama:pull-custom -- <name>  Pull a model
 
-task clean        Wipe all data
+task clean-workflows  Remove all sample workflows
+task clean            Wipe all data
 ```
 
 ## Layout
 
 ```text
-.setup/           Docker Compose + env files
-.data/            Persistent data (models, outputs, logs)
-.claude/skills/   Claude Code slash commands
-ChatDev/          Upstream repo (untouched)
+.setup/              Docker Compose + env files
+.data/               Persistent data (models, outputs, logs)
+.claude/skills/      Single /chatdev skill (CTO entry point)
+.claude/agents/      architect, engineer, reviewer agents
+.src/                Upstream ChatDev repo (auto-cloned, ephemeral)
 ```

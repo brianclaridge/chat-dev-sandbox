@@ -30,10 +30,14 @@ Models loaded:
 ```bash
 # --- Lifecycle ---
 task setup              # create .env from template (one-time)
-task up                 # build + start + pull default model
+task up                 # clone .src/ (if needed) + build + start + pull model + clean workflows
 task down               # stop all containers
-task restart            # stop + rebuild + start
+task restart            # stop + delete .src/ + re-clone + rebuild + start (clean slate)
 task ps                 # show running services
+
+# --- Source ---
+task clone              # clone ChatDev into .src/ (no-op if present)
+task reclone            # delete .src/ and re-clone fresh
 
 # --- Logs ---
 task logs               # tail all services
@@ -48,6 +52,9 @@ task ollama:list        # list pulled models
 task ollama:pull        # pull default model (qwen3-coder-next)
 task ollama:pull-custom -- <model>   # pull any model by name
 
+# --- Workflow Cleanup ---
+task clean-workflows    # remove all sample workflows (team creates fresh ones per task)
+
 # --- Maintenance ---
 task validate           # validate YAML workflow files
 task sync               # sync Vue graphs to DB
@@ -56,77 +63,86 @@ task clean              # stop + wipe all .data/ (with confirmation)
 
 ---
 
-## Claude Code Skills
+## Claude Code Skill
 
-Slash commands that integrate with the ChatDev API. Services must be running (`task up`).
+One entry point: `/chatdev [prompt]`. This spawns a multi-agent team that designs
+a custom workflow from scratch, executes it, and delivers results.
 
 | Command | What it does |
 |---|---|
-| `/chatdev [prompt]` | Generate a full software project from a description |
-| `/chatdev-game [prompt]` | Generate a pygame game |
-| `/chatdev-viz [prompt] [file]` | Generate charts/visualizations from a data file |
-| `/chatdev-research [topic]` | Run multi-agent deep research on a topic |
-| `/chatdev-validate [file]` | Validate a workflow YAML against the schema |
-| `/chatdev-workflows [name?]` | List all workflows, or inspect a specific one |
-| `/chatdev-status [session-id]` | Check progress/results of a running workflow |
+| `/chatdev [prompt]` | Spawn a CTO-led team to build anything — software, games, visualizations, research |
+
+### Team Architecture
+
+```
+/chatdev "A space shooter with power-ups"
+  │
+  ▼
+CTO (main Claude session)
+  ├── architect  — designs a custom workflow YAML tailored to the task
+  ├── engineer   — executes the workflow via the ChatDev API, collects artifacts
+  └── reviewer   — QAs the output, summarizes results for the user
+```
+
+Workflows are created from scratch every time — no pre-existing templates or sample
+workflows are assumed. The architect has the full YAML schema baked into its agent
+definition and designs the optimal graph for each task.
 
 ```
 .claude/
 ├── agents/
-│   └── skill-guru/AGENT.md        <- agent for creating new skills
+│   ├── architect/AGENT.md   <- workflow YAML designer
+│   ├── engineer/AGENT.md    <- API/WS executor
+│   └── reviewer/AGENT.md    <- output QA
 └── skills/
-    ├── chatdev/SKILL.md           <- software project generation
-    ├── chatdev-game/SKILL.md      <- game generation
-    ├── chatdev-viz/SKILL.md       <- data visualization
-    ├── chatdev-research/SKILL.md  <- deep research
-    ├── chatdev-validate/SKILL.md  <- workflow YAML validation
-    ├── chatdev-workflows/SKILL.md <- list/inspect workflows
-    └── chatdev-status/SKILL.md    <- check session status
+    └── chatdev/SKILL.md     <- CTO entry point (spawns team)
 ```
-
-All skills use the same async pattern: `POST /api/workflow/execute` -> long-poll
-`/api/sessions/{id}/artifact-events` -> download results. The `skill-guru` agent
-knows the full ChatDev API and skill authoring spec for creating new skills.
 
 ---
 
 ## Architecture
 
-```
-openbmb/
-├── CLAUDE.md                  <- this file
-├── Taskfile.yml               <- task runner (project root)
-├── .env                       <- user config, created by task setup (gitignored)
-├── .setup/
-│   ├── compose.yml            <- Docker Compose (backend, frontend, ollama)
-│   ├── .env.example           <- template copied to ../.env
-│   └── .env.docker            <- Docker-internal overrides (bind addr, CORS)
-├── .data/
-│   ├── ollama/                <- model weights (~55GB with current models)
-│   ├── warehouse/             <- ChatDev generated projects
-│   ├── logs/                  <- server + workflow logs
-│   └── data/                  <- vuegraphs.db and app data
-└── ChatDev/                   <- UNTOUCHED upstream repo
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+graph TD
+    root["openbmb/"]
+    root --- claudemd["CLAUDE.md"]
+    root --- taskfile["Taskfile.yml"]
+    root --- envfile[".env — user config (gitignored)"]
+    root --- setup[".setup/"]
+    root --- dotdata[".data/"]
+    root --- src[".src/ — auto-cloned ChatDev (gitignored)"]
+
+    setup --- compose["compose.yml"]
+    setup --- envex[".env.example"]
+    setup --- envdocker[".env.docker"]
+
+    dotdata --- ollama["ollama/ — model weights"]
+    dotdata --- warehouse["warehouse/ — generated projects"]
+    dotdata --- logs["logs/"]
+    dotdata --- data["data/ — vuegraphs.db"]
+    dotdata --- output["output/ — skill downloads"]
 ```
 
 ### Service Diagram
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  .setup/compose.yml                                           │
-│                                                                │
-│  ┌───────────┐   ┌───────────┐   ┌────────────────────────┐  │
-│  │ frontend  │──>│  backend  │──>│  ollama                │  │
-│  │ :5173     │   │  :6400    │   │  :11435 (host)         │  │
-│  │ (vite)    │   │  (fastapi)│   │  :11434 (container)    │  │
-│  └───────────┘   └───────────┘   └────────────────────────┘  │
-│       │               │                    │                   │
-│       │proxy          │                    │                   │
-│       │/api,/ws ──────┘               .data/ollama/           │
-│                  .data/warehouse/                              │
-│                  .data/logs/                                   │
-│                  .data/data/                                   │
-└──────────────────────────────────────────────────────────────┘
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+graph LR
+    Browser -->|":5173"| Frontend
+    Frontend -->|"proxy /api, /ws"| Backend
+    Backend -->|":11434 internal"| Ollama
+
+    subgraph Docker [".setup/compose.yml"]
+        Frontend["frontend<br/>(Vite) :5173"]
+        Backend["backend<br/>(FastAPI) :6400"]
+        Ollama["ollama<br/>:11435 host / :11434 container"]
+    end
+
+    Backend -.- warehouse[".data/warehouse/"]
+    Backend -.- logs[".data/logs/"]
+    Backend -.- data[".data/data/"]
+    Ollama -.- models[".data/ollama/"]
 ```
 
 ### Networking
@@ -145,8 +161,11 @@ to the backend container. The browser never talks to port 6400 directly.
 
 ## Constraint
 
-**No files inside `./ChatDev/` are created or modified.** We reuse ChatDev's existing
-Dockerfiles by pointing `build.context` at `../ChatDev` from the compose file.
+**`.src/` is ephemeral and disposable.** It is auto-cloned from
+`https://github.com/OpenBMB/ChatDev.git` by `task up` (or `task clone`).
+`task restart` deletes and re-clones it for a clean slate. Never commit
+changes to `.src/` — all customization lives in `.setup/`, `.env`, and
+`Taskfile.yml`.
 
 ---
 
@@ -166,6 +185,9 @@ API_KEY=ollama
 # BASE_URL=https://api.openai.com/v1
 # API_KEY=sk-...
 
+# Model name — used by workflow YAMLs as ${MODEL_NAME}
+MODEL_NAME=qwen3-coder-next
+
 # Ollama container port on host (default 11435 to avoid conflict with host Ollama)
 OLLAMA_HOST_PORT=11435
 ```
@@ -180,6 +202,10 @@ OLLAMA_HOST_PORT=11435
   running on the host at 11434.
 - **Ollama memory limit is 64GB** to accommodate large models like qwen3-coder-next.
 - **Backend has resource limits**: 2 CPUs, 4GB RAM, 256 PIDs.
+- **`MODEL_NAME`** env var is used by the architect agent when designing workflows.
+  It bakes `${MODEL_NAME}` into YAML node configs so the backend resolves it at runtime.
+- **`task clean-workflows`** runs on `task up` to remove all sample workflows.
+  The architect creates fresh, task-specific workflows from scratch.
 
 ---
 
