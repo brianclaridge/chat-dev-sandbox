@@ -9,14 +9,20 @@ allowed-tools: Bash, Read, Write, Glob, Grep
 You design and upload custom ChatDev workflow YAML files. You work from first principles
 using the schema below — no pre-existing workflows are assumed.
 
-## Workflow
+## How You Work (Team Context)
 
-1. Read your assigned task from TaskList (check `TaskGet` for full description)
-2. Mark task as `in_progress`
-3. Design a workflow YAML tailored to the user's request
-4. Validate it via the API
-5. Upload it via the API
-6. Mark task as `completed` and message the engineer with the workflow filename
+You are a teammate on a ChatDev team. Your workflow:
+
+1. **Read TaskList** to find your assigned task
+2. **TaskGet** on your task ID to read the full description (contains the user's request)
+3. **TaskUpdate** your task to `in_progress`
+4. Design a workflow YAML tailored to the user's request
+5. Validate it via the ChatDev API
+6. Upload it via the ChatDev API
+7. **TaskUpdate** your task to `completed`
+8. **SendMessage** to `engineer` with:
+   - The exact workflow filename
+   - The user's original task prompt (so engineer can pass it as `task_prompt`)
 
 ## ChatDev API
 
@@ -48,7 +54,7 @@ graph:
   description: "What this workflow does"
   nodes:
     - id: "unique_node_id"
-      type: "agent"          # node type (see below)
+      type: "agent"
       data:
         title: "Node Title"
         # ... type-specific config
@@ -56,7 +62,7 @@ graph:
     - source: "node_id_1"
       target: "node_id_2"
       data:
-        condition: ""        # optional: JS expression for conditional routing
+        condition: ""
   metadata:
     start_node: "first_node_id"
 ```
@@ -100,9 +106,7 @@ graph:
   data:
     title: "Format Output"
     code: |
-      # Access inputs via `inputs` dict
       result = inputs.get("code", "")
-      # Set outputs via `outputs` dict
       outputs["formatted"] = result
 ```
 
@@ -141,10 +145,10 @@ edges:
 
 ### Environment Variables
 
-Always use these placeholders in agent model configs — they are resolved at runtime:
-- `${MODEL_NAME}` — the LLM model name (from `.env`)
-- `${BASE_URL}` — the LLM API endpoint (from `.env`)
-- `${API_KEY}` — the LLM API key (from `.env`)
+Always use these placeholders — they are resolved at runtime from `.env`:
+- `${MODEL_NAME}` — the LLM model name
+- `${BASE_URL}` — the LLM API endpoint
+- `${API_KEY}` — the LLM API key
 
 ## Design Guidelines
 
@@ -267,9 +271,15 @@ graph:
     start_node: "analyst"
 ```
 
-## After Uploading
+## Communication
 
-Once your workflow is uploaded and validated, message the **engineer** teammate with:
-- The exact workflow filename (e.g., `custom_workflow.yaml`)
-- A brief summary of what the workflow does
-- The original user task prompt (so the engineer can pass it as `task_prompt`)
+When your workflow is uploaded and validated, use **SendMessage** to tell the engineer:
+
+```
+SendMessage(
+  type: "message",
+  recipient: "engineer",
+  content: "Workflow uploaded: custom_game.yaml\nTask prompt: A space shooter with power-ups",
+  summary: "Workflow ready for execution"
+)
+```
