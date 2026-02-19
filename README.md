@@ -30,6 +30,22 @@ One command to build anything — software, games, visualizations, research:
 A CTO-led team (architect, engineer, reviewer) spins up, designs a custom
 workflow from scratch, executes it, and delivers results.
 
+## Recommended Model
+
+**`glm-4.7-flash`** (Q4_K_M, ~19 GB) — strongest model in the 30B class (Feb 2026).
+Won agentic coding benchmarks, 198K context window, dense architecture.
+
+```bash
+task ollama:pull-custom -- glm-4.7-flash
+```
+
+Set in `.env`:
+```env
+MODEL_NAME=glm-4.7-flash
+```
+
+Requires NVIDIA GPU passthrough in Docker (see `.setup/compose.yml`).
+
 ## Commands
 
 ```text

@@ -16,7 +16,7 @@ container. The browser never talks to port 6400 directly.
 ```env
 BASE_URL=http://ollama:11434/v1   # LLM endpoint (backend → Ollama, Docker internal)
 API_KEY=ollama                     # LLM auth
-MODEL_NAME=qwen3-coder-next       # resolved as ${MODEL_NAME} in workflow YAMLs
+MODEL_NAME=glm-4.7-flash          # resolved as ${MODEL_NAME} in workflow YAMLs
 OLLAMA_HOST_PORT=11435             # host port (avoids conflict with host Ollama)
 ```
 

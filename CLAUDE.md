@@ -12,7 +12,7 @@ code. Runs entirely offline via Ollama.
 | Backend | FastAPI (Python) | chatdev_backend | 6400 |
 | LLM | Ollama | chatdev_ollama | 11435 (host) / 11434 (internal) |
 
-Default model: `qwen3-coder-next` (51 GB). Set via `MODEL_NAME` in `.env`.
+Default model: `glm-4.7-flash` (~19 GB). Set via `MODEL_NAME` in `.env`.
 
 ## Commands
 

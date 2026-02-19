@@ -6,7 +6,7 @@ vars:
   DC: docker compose -f .setup/compose.yml --env-file .env
   BACKEND_PORT: "6400"
   FRONTEND_PORT: "5173"
-  OLLAMA_MODEL: "qwen3-coder-next"
+  OLLAMA_MODEL: "glm-4.7-flash"
   CHATDEV_REPO: "https://github.com/OpenBMB/ChatDev.git"
   SRC_DIR: ".src"
 
@@ -34,6 +34,7 @@ tasks:
       - echo "Waiting for services to become healthy..."
       - "{{.DC}} exec ollama ollama pull {{.OLLAMA_MODEL}}"
       - task: clean-workflows
+      - task: ollama:warmup
       - echo ""
       - echo "Backend   → http://localhost:{{.BACKEND_PORT}}"
       - echo "Frontend  → http://localhost:{{.FRONTEND_PORT}}"
@@ -82,6 +83,14 @@ tasks:
   ollama:pull-custom:
     desc: "Pull a specific model (usage: task ollama:pull-custom -- llama3)"
     cmd: "{{.DC}} exec ollama ollama pull {{.CLI_ARGS}}"
+
+  ollama:warmup:
+    desc: Warm up the model by loading it into GPU VRAM
+    cmd: |
+      echo "Warming up {{.OLLAMA_MODEL}} (loading into GPU)..."
+      curl -sf http://localhost:${OLLAMA_HOST_PORT:-11435}/api/generate \
+        -d "{\"model\":\"{{.OLLAMA_MODEL}}\",\"prompt\":\"hi\",\"stream\":false}" \
+        > /dev/null && echo "Model loaded into GPU." || echo "Warmup failed (non-fatal)."
 
   # ===== Workflow Cleanup =====
   clean-workflows:
